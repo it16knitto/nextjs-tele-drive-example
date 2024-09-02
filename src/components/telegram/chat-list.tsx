@@ -2,6 +2,9 @@
 import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { getTelegramListChatsGroups } from '@/services/telegram';
+import { useGlobalState } from '@/state/globalstate';
+import { link } from 'fs';
+import Link from 'next/link';
 
 interface Chat {
   id: string;
@@ -14,6 +17,7 @@ interface Chat {
 
 export default function ChatList() {
   const [chats, setChats] = useState<Chat[]>([]);
+  const [, setSelectedChat] = useGlobalState('selectedChat'); // Assuming 'selectedChat' is the key for the global state
 
   useEffect(() => {
     const fetchChats = async () => {
@@ -35,28 +39,36 @@ export default function ChatList() {
     fetchChats();
   }, []);
 
+  const handleChatClick = (chat: Chat) => {
+    setSelectedChat(chat);
+  };
+
   return (
     <div className='overflow-y-auto bg-gray-900 text-white h-full p-2'>
       {chats.map((chat) => (
-        <div
-          key={chat.id}
-          className='flex items-center p-2 border-b border-gray-700 hover:bg-gray-800 cursor-pointer'
-        >
-          <div className='flex-1'>
-            <div className='flex justify-between items-center'>
-              <h3 className='font-semibold text-sm'>{chat.name}</h3>
-              <span className='text-xs text-gray-400'>{chat.timestamp}</span>
+        <Link href={`/telegram/chat?groupId=${chat.id}`} key={chat.id}>
+          <div
+            key={chat.id}
+            className='flex items-center p-2 border-b border-gray-700 hover:bg-gray-800 cursor-pointer'
+          >
+            <div className='flex-1'>
+              <div className='flex justify-between items-center'>
+                <h3 className='font-semibold text-sm'>{chat.name}</h3>
+                <span className='text-xs text-gray-400'>{chat.timestamp}</span>
+              </div>
+              <p className='text-xs text-gray-500 truncate'>
+                {chat.lastMessage}
+              </p>
             </div>
-            <p className='text-xs text-gray-500 truncate'>{chat.lastMessage}</p>
+            {chat.unreadCount && (
+              <div className='ml-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center'>
+                {chat.unreadCount > 1000
+                  ? `${(chat.unreadCount / 1000).toFixed(1)}k`
+                  : chat.unreadCount}
+              </div>
+            )}
           </div>
-          {chat.unreadCount && (
-            <div className='ml-2 bg-red-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center'>
-              {chat.unreadCount > 1000
-                ? `${(chat.unreadCount / 1000).toFixed(1)}k`
-                : chat.unreadCount}
-            </div>
-          )}
-        </div>
+        </Link>
       ))}
     </div>
   );

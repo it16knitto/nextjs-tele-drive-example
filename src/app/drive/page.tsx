@@ -23,7 +23,7 @@ import {
 import Image from 'next/image';
 import Modal from '@/components/modal';
 import Link from 'next/link';
-import { FileSystemItem } from '../interface/drive';
+import { FileSystemItem } from '../../interface/drive';
 
 export default function FileManager() {
   const [fileSystem, setFileSystem] = useState<FileSystemItem[]>([]);

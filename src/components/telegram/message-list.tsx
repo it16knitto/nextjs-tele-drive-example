@@ -1,97 +1,151 @@
-'use client'
+'use client';
 
-import Image from 'next/image'
-import { useRef, useEffect } from 'react'
+import { getTelegramMessages } from '@/services/telegram';
+import Image from 'next/image';
+import { useRef, useEffect, useState } from 'react';
 
 interface Message {
-  id: string
-  content: string
-  sender: 'user' | 'other'
-  timestamp: string
-  type: 'text' | 'image'
+  name: string;
+  message: string;
+  content: string;
+  photo: MessagePhoto | null;
+  date: number;
+  sender: string;
+  id: string;
+  img_message: string | null;
+  timestamp: string;
 }
 
-const messages: Message[] = [
-  {
-    id: '1',
-    content: 'Who was that philosopher you shared with me recently?',
-    sender: 'user',
-    timestamp: '2:14 PM',
-    type: 'text',
-  },
-  {
-    id: '2',
-    content: 'Roland Barthes',
-    sender: 'other',
-    timestamp: '2:16 PM',
-    type: 'text',
-  },
-  {
-    id: '3',
-    content: "That's him!",
-    sender: 'user',
-    timestamp: '2:16 PM',
-    type: 'text',
-  },
-  {
-    id: '4',
-    content: 'What was his vision statement?',
-    sender: 'user',
-    timestamp: '2:18 PM',
-    type: 'text',
-  },
-  {
-    id: '5',
-    content: '"Ultimately in order to see a photograph well, it is best to look away or close your eyes."',
-    sender: 'other',
-    timestamp: '2:20 PM',
-    type: 'text',
-  },
-  {
-    id: '6',
-    content: '/images/aerial-photo.jpg',
-    sender: 'other',
-    timestamp: '2:20 PM',
-    type: 'image',
-  },
-  // Add more messages here...
-]
+interface BufferData {
+  type: string;
+  data: number[];
+}
 
-export default function MessageList() {
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+interface PhotoSize {
+  type: string;
+  w?: number;
+  h?: number;
+  size?: number;
+  bytes?: BufferData;
+  sizes?: number[];
+  className: string;
+  id: string;
+}
+
+interface FileReference {
+  type: string;
+  data: number[];
+}
+
+interface MessagePhoto {
+  flags: number;
+  hasStickers: boolean;
+  id: string;
+  accessHash: string;
+  fileReference: FileReference;
+  date: number;
+  sizes: PhotoSize[];
+  videoSizes: null;
+  dcId: number;
+  className: string;
+}
+
+function bufferToBase64(buffer: number[]) {
+  const binary = buffer.reduce(
+    (acc, byte) => acc + String.fromCharCode(byte),
+    ''
+  );
+  return btoa(binary);
+}
+
+export default function MessageList({ groupId }: { groupId: string }) {
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
-  useEffect(scrollToBottom, [messages])
+  const fetchMessages = async (page: number) => {
+    if (!groupId) return;
+    try {
+      const response = await getTelegramMessages(groupId, page);
+
+      const formattedMessages = response.map((msg: any) => ({
+        id: msg.id,
+        content: msg.message,
+        sender: msg.isMeSend ? 'user' : 'other',
+        name: msg.name,
+        timestamp: new Date(msg.date * 1000).toLocaleString(),
+        type: msg.photo ? 'image' : 'text',
+        photo: msg.photo || null,
+        img_message: msg.photo
+          ? bufferToBase64(msg.photo.sizes[0].bytes.data)
+          : null
+      }));
+      console.log(formattedMessages);
+      setMessages((prevMessages) => [
+        ...formattedMessages.reverse(),
+        ...prevMessages
+      ]);
+      setHasMore(response.length > 0);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchMessages(page);
+  }, [groupId, page]);
+
+  useEffect(scrollToBottom, [messages]);
+
+  const loadMoreMessages = () => {
+    setPage((prevPage) => prevPage + 1);
+  };
 
   return (
-    <div className="flex-1 overflow-y-auto p-4 bg-gray-800 text-white">
-      {messages.map((message) => (
-        <div
-          key={message.id}
-          className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
+    <div className='flex-1 overflow-y-auto p-4 bg-gray-800 text-white'>
+      {hasMore && (
+        <button
+          onClick={loadMoreMessages}
+          className='mb-4 p-2 bg-blue-500 text-white rounded-lg'
         >
-          <div className={`max-w-[70%] ${message.sender === 'user' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white'} rounded-lg p-3`}>
-            {message.type === 'text' ? (
-              <p>{message.content}</p>
-            ) : (
-              <div className="relative w-full h-48">
-                {/* <Image
-                  src={message.content}
-                  alt="Shared image"
-                  layout="fill"
-                  objectFit="cover"
-                  className="rounded"
-                /> */}
-              </div>
-            )}
-            <p className="text-xs mt-1 text-gray-400">{message.timestamp}</p>
+          Load More
+        </button>
+      )}
+      {messages.map((message, index) => (
+        <div
+          key={`${message.id}-${index}`}
+          className={`flex ${
+            message.sender === 'user' ? 'justify-end' : 'justify-start'
+          } mb-4`}
+        >
+          <div
+            className={`max-w-[70%] ${
+              message.sender === 'user'
+                ? 'bg-blue-600 text-white'
+                : 'bg-gray-700 text-white'
+            } rounded-lg p-3`}
+          >
+            <p className='text-xs text-gray-400 mb-1'>{message.name}</p>
+            {message.img_message ? (
+              <Image
+                src={`data:image/png;base64,${message.img_message}`}
+                alt='Photo'
+                width={100}
+                height={100}
+                className='rounded-lg'
+              />
+            ) : null}
+            <p>{message.content}</p>
+            <p className='text-xs mt-1 text-gray-400'>{message.timestamp}</p>
           </div>
         </div>
       ))}
       <div ref={messagesEndRef} />
     </div>
-  )
+  );
 }
